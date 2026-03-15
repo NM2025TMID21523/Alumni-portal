@@ -65,11 +65,14 @@ const insert = (table, record) => {
   }
   const ids = data[table].map(r => r.id || 0);
   const id = (ids.length > 0 ? Math.max(...ids) : 0) + 1;
-  record.id = id;
-  record.created_at = new Date().toISOString();
-  data[table].push(record);
+  const insertedRecord = {
+    ...record,
+    id,
+    created_at: new Date().toISOString(),
+  };
+  data[table].push(insertedRecord);
   writeDB(data);
-  return { insertId: id };
+  return { insertId: id, record: insertedRecord };
 };
 
 const update = (table, id, updates) => {
@@ -83,6 +86,9 @@ const update = (table, id, updates) => {
 };
 
 // Routes
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true });
+});
 
 // Users
 app.get('/api/users', async (req, res) => {
@@ -101,7 +107,7 @@ app.post('/api/users', async (req, res) => {
     console.log('Creating user:', req.body);
     const result = insert('users', req.body);
     console.log('User created with ID:', result.insertId);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     console.error('Error creating user:', err);
     res.status(500).json({ error: err.message, details: err.stack });
@@ -131,7 +137,7 @@ app.get('/api/webinars', async (req, res) => {
 app.post('/api/webinars', async (req, res) => {
   try {
     const result = insert('webinars', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -150,7 +156,7 @@ app.get('/api/requests', async (req, res) => {
 app.post('/api/requests', async (req, res) => {
   try {
     const result = insert('mentorship_requests', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -160,7 +166,10 @@ app.put('/api/requests/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    await query('UPDATE mentorship_requests SET status = ? WHERE id = ?', [status, id]);
+    const result = update('mentorship_requests', id, { status });
+    if (!result.changes) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -200,7 +209,7 @@ app.get('/api/gallery', async (req, res) => {
 app.post('/api/gallery', async (req, res) => {
   try {
     const result = insert('gallery_images', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -219,7 +228,7 @@ app.get('/api/campaigns', async (req, res) => {
 app.post('/api/campaigns', async (req, res) => {
   try {
     const result = insert('fundraising_campaigns', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -248,7 +257,7 @@ app.get('/api/posts', async (req, res) => {
 app.post('/api/posts', async (req, res) => {
   try {
     const result = insert('community_posts', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -258,12 +267,12 @@ app.post('/api/posts', async (req, res) => {
 app.get('/api/messages/:userId1/:userId2', async (req, res) => {
   try {
     const { userId1, userId2 } = req.params;
-    const results = await query(
-      `SELECT * FROM private_messages 
-       WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
-       ORDER BY created_at ASC`,
-      [userId1, userId2, userId2, userId1]
-    );
+    const results = query('private_messages')
+      .filter(message => (
+        (String(message.sender_id) === String(userId1) && String(message.receiver_id) === String(userId2)) ||
+        (String(message.sender_id) === String(userId2) && String(message.receiver_id) === String(userId1))
+      ))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -273,7 +282,7 @@ app.get('/api/messages/:userId1/:userId2', async (req, res) => {
 app.post('/api/messages', async (req, res) => {
   try {
     const result = insert('private_messages', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -293,7 +302,7 @@ app.get('/api/notifications/:userId', async (req, res) => {
 app.post('/api/notifications', async (req, res) => {
   try {
     const result = insert('notifications', req.body);
-    res.json({ id: result.insertId, ...req.body });
+    res.json(result.record);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

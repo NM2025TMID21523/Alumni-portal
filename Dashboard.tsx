@@ -1,16 +1,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, UserRole, MentorshipRequest, Webinar, GalleryImage, AlumniEvent, AppNotification } from '../types';
-import { db } from '../services/db';
-import AlumniSearch from '../components/AlumniSearch';
-import WebinarModule from '../components/WebinarModule';
+import { User, UserRole, MentorshipRequest, Webinar, GalleryImage, AlumniEvent, AppNotification } from './types';
+import { db } from './db';
+import AlumniSearch from './AlumniSearch';
+import WebinarModule from './webinarModule';
 
-import PhotoGallery from '../components/PhotoGallery';
-import AdminModule from '../components/AdminModule';
-import DigitalID from '../components/DigitalID';
-import CommunityModule from '../components/CommunityModule';
-import MessagesModule from '../components/MessagesModule';
-import ThemeToggle from '../components/ThemeToggle';
+import PhotoGallery from './PhotoGallery';
+import AdminModule from './AdminModule';
+import DigitalID from './DigitalID';
+import CommunityModule from './CommunityModule';
+import MessagesModule from './MessageModule';
+import ThemeToggle from './ThemeToggle';
 
 interface DashboardProps {
   user: User;
@@ -39,16 +39,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, theme, toggleThem
         setTimeout(() => reject(new Error('Data loading timeout')), 5000)
       );
       
-      const [reqs, webs, gals, evs, notifs] = await Promise.race([
-        Promise.all([
-          db.getRequests().catch(e => { console.error('Error loading requests:', e); return []; }),
-          db.getWebinars().catch(e => { console.error('Error loading webinars:', e); return []; }),
-          db.getGallery().catch(e => { console.error('Error loading gallery:', e); return []; }),
-          db.getEvents().catch(e => { console.error('Error loading events:', e); return []; }),
-          db.getNotifications(user.id).catch(e => { console.error('Error loading notifications:', e); return []; })
-        ]),
-        timeoutPromise
+      const dataPromises = Promise.all([
+        db.getRequests().catch(e => { console.error('Error loading requests:', e); return []; }),
+        db.getWebinars().catch(e => { console.error('Error loading webinars:', e); return []; }),
+        db.getGallery().catch(e => { console.error('Error loading gallery:', e); return []; }),
+        db.getEvents().catch(e => { console.error('Error loading events:', e); return []; }),
+        db.getNotifications(user.id).catch(e => { console.error('Error loading notifications:', e); return []; })
       ]);
+      
+      const [reqs, webs, gals, evs, notifs] = await dataPromises;
       
       setRequests(reqs || []);
       setWebinars(webs || []);
@@ -93,13 +92,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, theme, toggleThem
     }
 
     const newRequest: MentorshipRequest = {
-      id: Math.random().toString(36).substr(2, 9),
-      studentId: user.id,
-      studentName: user.name,
-      alumniId: alumniId,
-      alumniName: alumniName,
+      id: Date.now(),
+      student_id: parseInt(user.id),
+      alumni_id: parseInt(alumniId),
       status: 'pending',
-      message: `I'd love to connect and learn more about your journey.`
+      message: `I'd love to connect and learn more about your journey.`,
+      created_at: new Date().toISOString()
     };
 
     await db.addRequest(newRequest);
@@ -114,7 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, theme, toggleThem
   };
 
   const handleMarkRead = async (id: string) => {
-    await db.markNotificationRead(id);
+    await db.markNotificationRead(parseInt(id));
     const updated = await db.getNotifications(user.id);
     setNotifications(updated);
   };

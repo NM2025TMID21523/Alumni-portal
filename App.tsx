@@ -1,12 +1,27 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
-import Dashboard from './pages/Dashboard';
+import LandingPage from './LandingPage';
+import Dashboard from './Dashboard';
 import { User } from './types';
 
+const AUTH_STORAGE_KEY = 'app-user';
+
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!savedUser) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(savedUser) as User;
+    } catch (error) {
+      console.error('Failed to restore saved user session', error);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      return null;
+    }
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('app-theme');
     if (saved === 'dark' || saved === 'light') return saved;
@@ -29,10 +44,12 @@ const App: React.FC = () => {
 
   const handleLogin = (userData: User) => {
     setUser(userData);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
   return (

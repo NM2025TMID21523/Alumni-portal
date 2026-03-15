@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, PrivateMessage } from '../types';
-import { db } from '../services/db';
+import { User, PrivateMessage } from './types';
+import { db } from './db';
 
 interface MessagesModuleProps {
   user: User;
@@ -14,12 +14,16 @@ const MessagesModule: React.FC<MessagesModuleProps> = ({ user }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    loadUsers();
+    loadUsers().catch(error => {
+      console.error('Failed to load users', error);
+    });
   }, []);
 
   useEffect(() => {
     if (selectedContact) {
-      loadConversation();
+      loadConversation().catch(error => {
+        console.error('Failed to load conversation', error);
+      });
     }
   }, [selectedContact]);
 
@@ -43,15 +47,16 @@ const MessagesModule: React.FC<MessagesModuleProps> = ({ user }) => {
     if (!msgInput.trim() || !selectedContact) return;
 
     const newMsg: PrivateMessage = {
-      id: Math.random().toString(36).substr(2, 9),
-      senderId: user.id,
-      receiverId: selectedContact.id,
-      text: msgInput,
-      timestamp: new Date().toISOString()
+      id: Date.now(),
+      sender_id: parseInt(user.id),
+      receiver_id: parseInt(selectedContact.id),
+      content: msgInput,
+      created_at: new Date().toISOString(),
+      read_status: false
     };
 
-    await db.sendMessage(newMsg);
-    setConvoMessages([...convoMessages, newMsg]);
+    const createdMessage = await db.sendMessage(newMsg);
+    setConvoMessages([...convoMessages, createdMessage]);
     setMsgInput('');
   };
 
@@ -103,15 +108,15 @@ const MessagesModule: React.FC<MessagesModuleProps> = ({ user }) => {
             
             <div className="flex-grow overflow-y-auto p-6 space-y-4">
               {convoMessages.map(msg => (
-                <div key={msg.id} className={`flex ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
+                <div key={msg.id} className={`flex ${String(msg.senderId || msg.sender_id) === user.id ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    msg.senderId === user.id 
+                    String(msg.senderId || msg.sender_id) === user.id 
                     ? 'bg-indigo-600 text-white rounded-tr-none shadow-sm' 
                     : 'bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200'
                   }`}>
-                    {msg.text}
-                    <p className={`text-[8px] mt-1 text-right font-medium ${msg.senderId === user.id ? 'text-indigo-200' : 'text-slate-400'}`}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {msg.text || msg.content}
+                    <p className={`text-[8px] mt-1 text-right font-medium ${String(msg.senderId || msg.sender_id) === user.id ? 'text-indigo-200' : 'text-slate-400'}`}>
+                      {new Date(msg.timestamp || msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>

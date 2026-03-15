@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Webinar, UserRole, User } from '../types';
-import { db } from '../services/db';
+import { Webinar, UserRole, User } from './types';
+import { db } from './db';
 
 interface WebinarModuleProps {
   user: User;
@@ -24,16 +24,21 @@ const WebinarModule: React.FC<WebinarModuleProps> = ({ user }) => {
     fetchWebinars();
   }, []);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const webinar: Webinar = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Date.now(),
       ...newWebinar,
       speaker: user.name,
       status: user.role === UserRole.ADMIN ? 'approved' : 'pending'
     };
-    db.addWebinar(webinar);
-    setWebinars(db.getWebinars());
+    try {
+      const createdWebinar = await db.addWebinar(webinar);
+      setWebinars(current => [...current, createdWebinar]);
+    } catch (error) {
+      console.error('Failed to create webinar', error);
+      return;
+    }
     setShowModal(false);
     setNewWebinar({ title: '', description: '', date: '', link: '' });
   };

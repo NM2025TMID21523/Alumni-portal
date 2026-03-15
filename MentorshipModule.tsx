@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User, UserRole, MentorshipRequest } from '../types';
-import { mockAlumni } from '../services/mockData';
+import { User, UserRole, MentorshipRequest } from './types';
+import { mockAlumni } from './mockData';
 
 interface MentorshipModuleProps {
   user: User;

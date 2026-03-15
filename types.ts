@@ -17,6 +17,11 @@ export interface User {
   bio?: string;
   created_at?: string;
   updated_at?: string;
+  batch?: string;
+  company?: string;
+  status?: string;
+  joinDate?: string;
+  linkedin_url?: string;
 }
 
 export interface Message {

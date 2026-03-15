@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { UserRole, User } from '../types';
-import { db } from '../services/db';
+import { UserRole, User } from './types';
+import { db } from './db';
 
 interface AuthFormProps {
   type: 'login' | 'register' | 'forgot';

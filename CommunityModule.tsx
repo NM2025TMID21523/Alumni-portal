@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, CommunityPost } from '../types';
-import { db } from '../services/db';
+import { User, CommunityPost } from './types';
+import { db } from './db';
 
 interface CommunityModuleProps {
   user: User;
@@ -10,10 +10,11 @@ interface CommunityModuleProps {
 const CommunityModule: React.FC<CommunityModuleProps> = ({ user }) => {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [postInput, setPostInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadCommunityData();
+    loadCommunityData().catch(error => {
+      console.error('Failed to load community data', error);
+    });
   }, []);
 
   const loadCommunityData = async () => {
@@ -26,17 +27,17 @@ const CommunityModule: React.FC<CommunityModuleProps> = ({ user }) => {
     if (!postInput.trim()) return;
 
     const newPost: CommunityPost = {
-      id: Math.random().toString(36).substr(2, 9),
-      authorId: user.id,
+      id: Date.now(),
+      author_id: parseInt(user.id),
       authorName: user.name,
       authorRole: user.role,
       content: postInput,
-      timestamp: new Date().toISOString(),
-      likes: 0
+      created_at: new Date().toISOString(),
+      likes: 0,
     };
 
-    await db.addPost(newPost);
-    setPosts([newPost, ...posts]);
+    const createdPost = await db.addPost(newPost);
+    setPosts([createdPost, ...posts]);
     setPostInput('');
   };
 
@@ -71,14 +72,14 @@ const CommunityModule: React.FC<CommunityModuleProps> = ({ user }) => {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
-                      {post.authorName.charAt(0)}
+                      {(post.authorName || 'C').charAt(0)}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900">{post.authorName}</h4>
-                      <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">{post.authorRole}</p>
+                      <h4 className="text-sm font-bold text-slate-900">{post.authorName || 'Community Member'}</h4>
+                      <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">{post.authorRole || 'member'}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-medium">{new Date(post.timestamp).toLocaleString()}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">{new Date(post.timestamp || post.created_at).toLocaleString()}</span>
                 </div>
                 <p className="text-slate-700 text-sm leading-relaxed mb-6 whitespace-pre-wrap">{post.content}</p>
                 <div className="flex items-center gap-4 pt-4 border-t border-slate-50">

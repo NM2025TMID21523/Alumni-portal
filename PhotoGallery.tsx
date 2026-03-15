@@ -1,97 +1,106 @@
+import React, { useEffect, useState } from 'react';
+import { GalleryImage, User } from './types';
+import { db } from './db';
 
-import React, { useState, useEffect } from 'react';
-import ThemeToggle from './ThemeToggle';
-
-interface NavbarProps {
-  onJoinClick: () => void;
-  onRegisterClick: () => void;
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
+interface PhotoGalleryProps {
+  user: User;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onJoinClick, onRegisterClick, theme, toggleTheme }) => {
-  const [isScrolled, setIsScrolled] = useState(false);
+const PhotoGallery: React.FC<PhotoGalleryProps> = ({ user }) => {
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [caption, setCaption] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    loadGallery().catch(error => {
+      console.error('Failed to load gallery', error);
+    });
   }, []);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const loadGallery = async () => {
+    const galleryImages = await db.getGallery();
+    setImages(galleryImages);
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!imageUrl.trim()) {
+      return;
+    }
+
+    await db.addImage({
+      id: Date.now(),
+      title: caption || 'Campus memory',
+      caption: caption || 'Campus memory',
+      image_url: imageUrl,
+      url: imageUrl,
+      uploaded_by: Number(user.id),
+      created_at: new Date().toISOString(),
+    });
+
+    setCaption('');
+    setImageUrl('');
+    await loadGallery();
   };
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      isScrolled 
-        ? theme === 'dark' ? 'bg-slate-950/90 border-b border-slate-800' : 'bg-white/95 border-b border-slate-100'
-        : 'bg-transparent'
-    } py-3 sm:py-4 backdrop-blur-md`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div 
-            className="flex items-center space-x-2 cursor-pointer group"
-            onClick={scrollToTop}
-          >
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition duration-300">
-              <span className="text-white font-bold text-xl">A</span>
-            </div>
-            <span className={`text-xl font-black tracking-tighter transition-colors duration-300 ${
-              isScrolled ? theme === 'dark' ? 'text-white' : 'text-slate-900' : 'text-white'
-            }`}>
-              AlumniPortal
-            </span>
-          </div>
-          
-          <div className="hidden md:flex items-center space-x-8 text-sm font-bold uppercase tracking-widest">
-            <button 
-              onClick={scrollToTop}
-              className={`transition-colors duration-300 hover:text-indigo-600 ${
-                isScrolled ? theme === 'dark' ? 'text-slate-300' : 'text-slate-600' : 'text-slate-200'
-              }`}
-            >
-              Home
-            </button>
-            <button 
-              onClick={onJoinClick} 
-              className={`transition-colors duration-300 hover:text-indigo-600 ${
-                isScrolled ? theme === 'dark' ? 'text-slate-300' : 'text-slate-600' : 'text-slate-200'
-              }`}
-            >
-              Join
-            </button>
-            <button 
-              onClick={onRegisterClick} 
-              className={`transition-colors duration-300 hover:text-indigo-600 ${
-                isScrolled ? theme === 'dark' ? 'text-slate-300' : 'text-slate-600' : 'text-slate-200'
-              }`}
-            >
-              Register
-            </button>
-            
-            <ThemeToggle theme={theme} toggleTheme={toggleTheme} className="ml-4" />
-          </div>
+    <div className="space-y-8 pb-16">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-bold text-slate-900">Photo Gallery</h2>
+        <p className="mt-2 text-sm text-slate-500">Share campus moments with the alumni community.</p>
 
-          <div className="flex md:hidden items-center gap-4">
-            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-            <button 
-              onClick={onJoinClick} 
-              className={`px-5 py-2 rounded-full font-bold text-sm transition-all ${
-                isScrolled 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                : 'bg-white/20 backdrop-blur-md text-white border border-white/30'
-              }`}
-            >
-              Join
-            </button>
+        <form onSubmit={handleSubmit} className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={event => setImageUrl(event.target.value)}
+            placeholder="Image URL"
+            className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+            required
+          />
+          <input
+            type="text"
+            value={caption}
+            onChange={event => setCaption(event.target.value)}
+            placeholder="Caption"
+            className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+          />
+          <button
+            type="submit"
+            className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+          >
+            Add Photo
+          </button>
+        </form>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {images.map(image => (
+          <article key={image.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="aspect-[4/3] bg-slate-100">
+              <img
+                src={image.url || image.image_url}
+                alt={image.caption || image.title || 'Gallery image'}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="p-5">
+              <p className="text-sm font-bold text-slate-900">{image.caption || image.title || 'Campus memory'}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {new Date(image.date || image.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          </article>
+        ))}
+
+        {images.length === 0 && (
+          <div className="col-span-full rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">
+            No photos uploaded yet.
           </div>
-        </div>
-      </div>
-    </nav>
+        )}
+      </section>
+    </div>
   );
 };
 
-export default Navbar;
+export default PhotoGallery;

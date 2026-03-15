@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import Navbar from '../components/Navbar';
-import Hero from '../components/Hero';
-import About from '../components/About';
-import Footer from '../components/Footer';
-import AuthForm from '../components/AuthForm';
-import { UserRole, User } from '../types';
+import Navbar from './Navbar';
+import Hero from './Hero';
+import About from './about';
+import Footer from './Footer';
+import AuthForm from './AuthForm';
+import { UserRole, User } from './types';
 
 interface LandingPageProps {
   onLogin: (user: User) => void;

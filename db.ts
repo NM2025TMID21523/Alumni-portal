@@ -1,23 +1,37 @@
-import { User, UserRole, Webinar, MentorshipRequest, GalleryImage, AlumniEvent, Announcement, FundraisingCampaign, Donor, CommunityPost, PrivateMessage, AppNotification } from '../types';
+import { User, UserRole, Webinar, MentorshipRequest, GalleryImage, AlumniEvent, Announcement, FundraisingCampaign, Donor, CommunityPost, PrivateMessage, AppNotification } from './types';
 
 // use relative path; dev server proxies to backend
 const API_BASE_URL = '/api';
+const REQUEST_TIMEOUT_MS = 8000;
 
 class DatabaseService {
   private async apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-      ...options,
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+        signal: controller.signal,
+        ...options,
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timed out for ${endpoint}`);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
-
-    return response.json();
   }
 
   // User Operations
@@ -86,7 +100,7 @@ class DatabaseService {
 
   async addNotification(notif: AppNotification): Promise<void> {
     const dbNotif = {
-      user_id: notif.userId,
+      user_id: notif.user_id,
       title: notif.title,
       message: notif.message,
       type: notif.type,
@@ -97,7 +111,7 @@ class DatabaseService {
     });
   }
 
-  async markNotificationRead(id: string): Promise<void> {
+  async markNotificationRead(id: number): Promise<void> {
     await this.apiRequest(`/notifications/${id}/read`, {
       method: 'PUT',
     });
@@ -113,40 +127,59 @@ class DatabaseService {
 
   // Community Feed
   async getPosts(): Promise<CommunityPost[]> {
-    const posts = await this.apiRequest<any[]>('/posts');
-    // Note: This would need to join with users table to get authorName and authorRole
-    // For now, returning basic structure
+    const [posts, users] = await Promise.all([
+      this.apiRequest<any[]>('/posts'),
+      this.getUsers().catch(() => []),
+    ]);
+
+    const usersById = new Map(users.map(user => [String(user.id), user]));
     return posts.map(post => ({
       ...post,
-      id: post.id.toString(),
-      authorId: post.author_id.toString(),
-      content: post.content,
+      id: Number(post.id),
+      author_id: Number(post.author_id),
+      authorId: String(post.author_id),
+      authorName: usersById.get(String(post.author_id))?.name || 'Community Member',
+      authorRole: usersById.get(String(post.author_id))?.role || UserRole.ALUMNI,
+      content: post.content || '',
+      created_at: post.created_at,
       timestamp: post.created_at,
-      likes: 0, // This field doesn't exist in current DB
+      likes: Number(post.likes || 0),
     }));
   }
 
-  async addPost(post: CommunityPost): Promise<void> {
+  async addPost(post: CommunityPost): Promise<CommunityPost> {
     const dbPost = {
       title: post.title || null,
       content: post.content,
-      author_id: parseInt(post.authorId),
+      author_id: post.author_id,
     };
-    await this.apiRequest('/posts', {
+    const createdPost = await this.apiRequest<any>('/posts', {
       method: 'POST',
       body: JSON.stringify(dbPost),
     });
     // Create global notification for new posts
     const notif: AppNotification = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId: 'all',
+      id: Date.now(),
+      user_id: 'all',
       title: 'New Community Post',
       message: `${post.authorName || 'Someone'} shared an update.`,
       type: 'community',
-      timestamp: new Date().toISOString(),
-      isRead: false
+      created_at: new Date().toISOString(),
+      read_status: false
     };
     await this.addNotification(notif);
+
+    return {
+      ...createdPost,
+      id: Number(createdPost.id),
+      author_id: Number(createdPost.author_id ?? post.author_id),
+      authorName: post.authorName || 'Community Member',
+      authorRole: post.authorRole || UserRole.ALUMNI,
+      content: createdPost.content || post.content,
+      created_at: createdPost.created_at || new Date().toISOString(),
+      timestamp: createdPost.created_at || new Date().toISOString(),
+      likes: 0,
+    };
   }
 
   // Private Messages
@@ -154,25 +187,37 @@ class DatabaseService {
     const messages = await this.apiRequest<any[]>(`/messages/${userId1}/${userId2}`);
     return messages.map(msg => ({
       ...msg,
-      id: msg.id.toString(),
-      senderId: msg.sender_id.toString(),
-      receiverId: msg.receiver_id.toString(),
+      id: Number(msg.id),
+      sender_id: Number(msg.sender_id),
+      receiver_id: Number(msg.receiver_id),
+      senderId: String(msg.sender_id),
+      receiverId: String(msg.receiver_id),
       text: msg.content,
       timestamp: msg.created_at,
     }));
   }
 
-  async sendMessage(msg: PrivateMessage): Promise<void> {
+  async sendMessage(msg: PrivateMessage): Promise<PrivateMessage> {
     const dbMsg = {
-      sender_id: parseInt(msg.senderId),
-      receiver_id: parseInt(msg.receiverId),
+      sender_id: msg.sender_id,
+      receiver_id: msg.receiver_id,
       subject: msg.subject || null,
-      content: msg.text,
+      content: msg.content,
     };
-    await this.apiRequest('/messages', {
+    const createdMessage = await this.apiRequest<any>('/messages', {
       method: 'POST',
       body: JSON.stringify(dbMsg),
     });
+
+    return {
+      ...createdMessage,
+      id: Number(createdMessage.id),
+      sender_id: Number(createdMessage.sender_id ?? msg.sender_id),
+      receiver_id: Number(createdMessage.receiver_id ?? msg.receiver_id),
+      text: createdMessage.content || msg.content,
+      timestamp: createdMessage.created_at || new Date().toISOString(),
+      read_status: Boolean(createdMessage.read_status),
+    };
   }
 
   // Webinar Operations
@@ -180,12 +225,13 @@ class DatabaseService {
     const webinars = await this.apiRequest<any[]>('/webinars');
     return webinars.map(webinar => ({
       ...webinar,
-      id: webinar.id.toString(),
+      id: Number(webinar.id),
       link: webinar.registration_link,
+      status: webinar.status || 'approved',
     }));
   }
 
-  async addWebinar(webinar: Webinar): Promise<void> {
+  async addWebinar(webinar: Webinar): Promise<Webinar> {
     const dbWebinar = {
       title: webinar.title,
       description: webinar.description,
@@ -193,11 +239,19 @@ class DatabaseService {
       speaker: webinar.speaker,
       speaker_bio: webinar.speaker_bio || null,
       registration_link: webinar.link,
+      status: webinar.status || 'pending',
     };
-    await this.apiRequest('/webinars', {
+    const createdWebinar = await this.apiRequest<any>('/webinars', {
       method: 'POST',
       body: JSON.stringify(dbWebinar),
     });
+
+    return {
+      ...createdWebinar,
+      id: Number(createdWebinar.id),
+      link: createdWebinar.registration_link || webinar.link,
+      status: createdWebinar.status || webinar.status || 'pending',
+    };
   }
 
   async updateWebinarStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
@@ -211,17 +265,20 @@ class DatabaseService {
     const requests = await this.apiRequest<any[]>('/requests');
     return requests.map(req => ({
       ...req,
-      id: req.id.toString(),
-      studentId: req.student_id.toString(),
-      alumniId: req.alumni_id.toString(),
+      id: Number(req.id),
+      student_id: Number(req.student_id),
+      alumni_id: Number(req.alumni_id),
+      studentId: String(req.student_id),
+      alumniId: String(req.alumni_id),
       message: req.message,
+      status: req.status || 'pending',
     }));
   }
 
   async addRequest(req: MentorshipRequest): Promise<void> {
     const dbReq = {
-      student_id: parseInt(req.studentId),
-      alumni_id: parseInt(req.alumniId),
+      student_id: req.student_id,
+      alumni_id: req.alumni_id,
       topic: req.topic || null,
       message: req.message,
     };
@@ -231,13 +288,13 @@ class DatabaseService {
     });
     // Trigger notification for the recipient
     const notif: AppNotification = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId: req.alumniId,
+      id: Date.now(),
+      user_id: req.alumni_id,
       title: 'New Mentorship Request',
       message: `${req.studentName || 'A student'} wants you to be their mentor.`,
       type: 'mentorship',
-      timestamp: new Date().toISOString(),
-      isRead: false
+      created_at: new Date().toISOString(),
+      read_status: false
     };
     await this.addNotification(notif);
   }
@@ -250,16 +307,16 @@ class DatabaseService {
 
     // Create notification for the student
     const requests = await this.getRequests();
-    const req = requests.find(r => r.id === id);
+    const req = requests.find(r => r.id === Number(id));
     if (req) {
       const notif: AppNotification = {
-        id: Math.random().toString(36).substr(2, 9),
-        userId: req.studentId,
+        id: Date.now(),
+        user_id: req.student_id,
         title: `Mentorship ${status}`,
         message: `${req.alumniName || 'Your mentor'} has ${status} your request.`,
         type: 'mentorship',
-        timestamp: new Date().toISOString(),
-        isRead: false
+        created_at: new Date().toISOString(),
+        read_status: false
       };
       await this.addNotification(notif);
     }

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Webinar, AlumniEvent, Announcement, FundraisingCampaign, Donor, GalleryImage } from '../types';
-import { db } from '../services/db';
+import { User, Webinar, AlumniEvent, Announcement, FundraisingCampaign, Donor, GalleryImage } from './types';
+import { db } from './db';
 
 const AdminModule: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'users' | 'approvals' | 'events' | 'campus' | 'fundraising' | 'gallery'>('dashboard');
@@ -60,9 +60,12 @@ const AdminModule: React.FC = () => {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     const campaign: FundraisingCampaign = { 
-      id: Math.random().toString(36).substr(2, 9), 
-      ...newCampaign, 
-      raisedAmount: 0, 
+      id: Date.now(), 
+      title: newCampaign.title,
+      description: newCampaign.description,
+      goal_amount: newCampaign.targetAmount,
+      current_amount: 0,
+      created_at: new Date().toISOString(),
       status: 'active' 
     };
     await db.addCampaign(campaign);
@@ -71,20 +74,20 @@ const AdminModule: React.FC = () => {
   };
 
   const stats = useMemo(() => {
-    const pendingUsrs = users.filter(u => u.status === 'pending');
-    const pendingWebs = webinars.filter(w => w.status === 'pending');
-    const pendingGals = gallery.filter(g => g.status === 'pending');
+    const pendingUsrs = users.filter((u: User) => u.status === 'pending');
+    const pendingWebs = webinars.filter((w: Webinar) => w.status === 'pending');
+    const pendingGals = gallery.filter((g: GalleryImage) => g.status === 'pending');
 
     return {
       totalUsers: users.length,
       pendingApprovals: pendingUsrs.length + pendingWebs.length + pendingGals.length,
       // Fix: Use the events state which is properly awaited, instead of the promise-returning db call
       activeEvents: events.length,
-      totalRaised: campaigns.reduce((acc, c) => acc + c.raisedAmount, 0)
+      totalRaised: campaigns.reduce((acc: number, c: FundraisingCampaign) => acc + (c.current_amount || 0), 0)
     };
   }, [users, webinars, gallery, campaigns, events]);
 
-  const pendingUsers = users.filter(u => u.status === 'pending');
+  const pendingUsers = users.filter((u: User) => u.status === 'pending');
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 pb-24">
@@ -223,7 +226,7 @@ const AdminModule: React.FC = () => {
                        <p className="text-xs text-slate-500">Requested by {w.speaker} • {w.date}</p>
                      </div>
                      <div className="flex gap-2">
-                       <button onClick={() => handleApproveWebinar(w.id)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">Approve</button>
+                       <button onClick={() => handleApproveWebinar(w.id.toString())} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">Approve</button>
                        <button className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition">Dismiss</button>
                      </div>
                    </div>
@@ -252,18 +255,18 @@ const AdminModule: React.FC = () => {
                   <div className="space-y-4 mb-8">
                     <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
                       <span>Progress</span>
-                      <span>{Math.round((c.raisedAmount/c.targetAmount)*100)}%</span>
+                      <span>{Math.round(((c.current_amount ?? 0) / (c.goal_amount ?? 1)) * 100)}%</span>
                     </div>
                     <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-indigo-600 rounded-full transition-all duration-1000" 
-                        style={{ width: `${(c.raisedAmount/c.targetAmount)*100}%` }}
+                        style={{ width: `${((c.current_amount ?? 0) / (c.goal_amount ?? 1)) * 100}%` }}
                       ></div>
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
-                        <p className="text-2xl font-black text-slate-900">${c.raisedAmount.toLocaleString()}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Goal: ${c.targetAmount.toLocaleString()}</p>
+                        <p className="text-2xl font-black text-slate-900">${(c.current_amount ?? 0).toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Goal: ${(c.goal_amount ?? 0).toLocaleString()}</p>
                       </div>
                     </div>
                   </div>
@@ -285,7 +288,7 @@ const AdminModule: React.FC = () => {
                     {img.status === 'pending' && (
                       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                         <div className="flex gap-2">
-                          <button onClick={() => handleApproveGallery(img.id)} className="p-3 bg-emerald-600 text-white rounded-full hover:scale-110 transition"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg></button>
+                          <button onClick={() => handleApproveGallery(img.id.toString())} className="p-3 bg-emerald-600 text-white rounded-full hover:scale-110 transition"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg></button>
                         </div>
                       </div>
                     )}

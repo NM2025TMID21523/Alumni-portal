@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { User } from '../types';
-import { mockAlumni, departments } from '../services/mockData';
+import { User } from './types';
+import { mockAlumni, departments } from './mockData';
 
 interface AlumniSearchProps {
   onConnect?: (alumniId: string, alumniName: string) => void;
