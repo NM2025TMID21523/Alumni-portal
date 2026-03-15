@@ -1,0 +1,66 @@
+{
+  "users": [
+    {
+      "name": "Test User",
+      "email": "test@example.com",
+      "role": "student",
+      "graduation_year": 2024,
+      "department": "Computer Science",
+      "bio": "Test bio",
+      "linkedin_url": "https://linkedin.com/in/test",
+      "id": 1,
+      "created_at": "2026-03-05T08:24:43.462Z"
+    },
+    {
+      "name": "DIVYA V",
+      "email": "23bca021@kprcas.ac.in",
+      "role": "student",
+      "department": "",
+      "profile_image": null,
+      "bio": null,
+      "linkedin_url": null,
+      "id": 2,
+      "created_at": "2026-03-05T08:27:35.605Z"
+    },
+    {
+      "name": "PRIYA ",
+      "email": "priya@gmail.com",
+      "role": "alumni",
+      "graduation_year": 2020,
+      "department": "Computer Science",
+      "profile_image": null,
+      "bio": "trainee at google",
+      "linkedin_url": null,
+      "id": 3,
+      "created_at": "2026-03-05T08:39:16.688Z"
+    },
+    {
+      "name": "Test User 2",
+      "email": "test2@example.com",
+      "role": "student",
+      "id": 4,
+      "created_at": "2026-03-09T07:44:10.254Z"
+    },
+    {
+      "name": "arun",
+      "email": "arun@kprcas.ac.in",
+      "role": "admin",
+      "department": "",
+      "profile_image": null,
+      "bio": null,
+      "linkedin_url": null,
+      "id": 5,
+      "created_at": "2026-03-09T07:48:33.729Z"
+    }
+  ],
+  "webinars": [],
+  "mentorship_requests": [],
+  "events": [],
+  "announcements": [],
+  "gallery_images": [],
+  "fundraising_campaigns": [],
+  "donors": [],
+  "community_posts": [],
+  "private_messages": [],
+  "notifications": []
+}
